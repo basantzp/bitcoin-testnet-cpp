@@ -1,0 +1,9 @@
+# Binaries and Objects
+bin/
+src/*.o
+*.o
+*.log
+*.pid
+.bitcoin-testnet-cpp.pid
+node_modules/
+.DS_Store
