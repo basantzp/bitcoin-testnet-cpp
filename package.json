@@ -1,0 +1,24 @@
+{
+  "name": "bitcoin-testnet-cpp",
+  "version": "1.0.0",
+  "description": "High-Performance Bitcoin Core Testnet4 Suite and Explorer written in C++",
+  "main": "api/index.js",
+  "scripts": {
+    "build": "make",
+    "start": "./scripts/start.sh",
+    "stop": "./scripts/stop.sh"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "keywords": [
+    "bitcoin",
+    "bitcoin-core",
+    "cpp",
+    "testnet4",
+    "explorer",
+    "blockchain"
+  ],
+  "author": "Basant Pokhrel",
+  "license": "MIT"
+}

@@ -1,0 +1,15 @@
+[Unit]
+Description=Bitcoin Core C++ Testnet Suite & Explorer Server
+After=network.target
+
+[Service]
+Type=simple
+User=basant
+WorkingDirectory=/home/basant/bitcoin-testnet-cpp
+ExecStart=/home/basant/bitcoin-testnet-cpp/bin/bitcoin-testnet-core 8332
+Restart=always
+RestartSec=5
+Environment=PORT=8332
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <!-- Primary SEO Meta Tags -->
+  <title>Bitcoin Core C++ Testnet Suite & Explorer | Open Source Bitcoin Engine</title>
+  <meta name="title" content="Bitcoin Core C++ Testnet Suite & Explorer | Open Source Bitcoin Engine">
+  <meta name="description" content="High-performance Bitcoin Testnet4 suite and block explorer written natively in C++. Explore blocks, evaluate Bitcoin Script opcodes, generate SegWit/Taproot addresses, and use the instant faucet.">
+  <meta name="keywords" content="Bitcoin, Bitcoin Core, C++, Testnet, Testnet4, Bitcoin Script, Blockchain Explorer, Taproot, SegWit, Faucet, Open Source, Basant">
+  <meta name="author" content="Basant">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="https://bitcoin-testnet-cpp.vercel.app/">
+
+  <!-- Open Graph / Facebook / Discord -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://bitcoin-testnet-cpp.vercel.app/">
+  <meta property="og:title" content="Bitcoin Core C++ Testnet Suite & Explorer">
+  <meta property="og:description" content="High-performance Bitcoin Testnet4 suite and block explorer written natively in C++ with real-time Script debugger and instant faucet.">
+  <meta property="og:image" content="https://bitcoin-testnet-cpp.vercel.app/favicon.svg">
+  <meta property="og:site_name" content="Bitcoin Core C++ Testnet">
+
+  <!-- Twitter / X -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:url" content="https://bitcoin-testnet-cpp.vercel.app/">
+  <meta name="twitter:title" content="Bitcoin Core C++ Testnet Suite & Explorer">
+  <meta name="twitter:description" content="High-performance Bitcoin Testnet4 suite and block explorer written natively in C++ with real-time Script debugger and instant faucet.">
+  <meta name="twitter:image" content="https://bitcoin-testnet-cpp.vercel.app/favicon.svg">
+
+  <!-- Favicon & Stylesheet -->
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <meta name="theme-color" content="#F7931A">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+
+  <!-- Structured Data / JSON-LD -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Bitcoin Core C++ Testnet Suite",
+    "operatingSystem": "Linux, Web, POSIX",
+    "applicationCategory": "DeveloperApplication",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "description": "High-performance Bitcoin Testnet4 suite, block explorer, and Script execution engine written natively in C++.",
+    "author": {
+      "@type": "Person",
+      "name": "Basant"
+    }
+  }
+  </script>
+</head>
+<body>
+
+  <!-- Navigation Header -->
+  <header>
+    <div class="nav-container">
+      <a href="/" class="brand" aria-label="Bitcoin Core Testnet Home">
+        <img src="/favicon.svg" alt="Bitcoin Logo" class="brand-icon">
+        <div class="brand-title">
+          Bitcoin Core <span class="brand-badge">C++ Engine</span>
+        </div>
+      </a>
+
+      <div class="nav-stats">
+        <div class="stat-pill" title="Network status">
+          <span class="status-dot"></span>
+          <span id="navNetwork">Testnet4</span>
+        </div>
+        <div class="stat-pill" title="Current block height">
+          <span style="color: var(--text-muted);">Height:</span>
+          <strong id="navHeight" style="color: var(--btc-gold);">-</strong>
+        </div>
+        <button class="btn btn-primary btn-sm" id="btnMineQuick" aria-label="Mine new block">
+          ⛏️ Mine Block
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main>
+    
+    <!-- Hero Banner -->
+    <section class="hero-banner">
+      <div class="hero-header">
+        <div>
+          <h1>Bitcoin Core Testnet Suite & Explorer</h1>
+          <p class="hero-desc">
+            Powered by a native <strong>C++17</strong> blockchain state engine. Explore real-time blocks, simulate Bitcoin Script opcodes, generate testnet addresses, and interact with the instant faucet sandbox.
+          </p>
+        </div>
+        <div class="hero-actions">
+          <button class="btn btn-secondary btn-sm" id="btnOpenFaucet" aria-label="Open Faucet Tab">🚰 Claim Faucet</button>
+          <button class="btn btn-secondary btn-sm" id="btnOpenDebugger" aria-label="Open Script Debugger">📜 Script Debugger</button>
+          <button class="btn btn-secondary btn-sm" id="btnRunBench" aria-label="Run Hashing Benchmark">⚡ C++ Benchmark</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Metrics Grid -->
+    <section class="metrics-grid" aria-label="Node Live Metrics">
+      <div class="metric-card">
+        <div class="metric-label">📦 Block Height</div>
+        <div class="metric-value" id="statHeight">-</div>
+        <div class="metric-sub" id="statBestHash">Best Hash: loading...</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">⏳ Mempool Queue</div>
+        <div class="metric-value" id="statMempool">0 TXs</div>
+        <div class="metric-sub">Relay Fee: 0.00001000 BTC</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">⚡ C++ Engine Rate</div>
+        <div class="metric-value" id="statHashrate">- MH/s</div>
+        <div class="metric-sub" id="statCompiler">GCC C++17 Optimized</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-label">⏱️ Node Uptime</div>
+        <div class="metric-value" id="statUptime">0s</div>
+        <div class="metric-sub">Protocol v70016 • Testnet4</div>
+      </div>
+    </section>
+
+    <!-- Tabs Navigation -->
+    <nav class="tabs-nav" aria-label="Explorer Features Navigation">
+      <button class="tab-btn active" data-tab="explorer" aria-label="Block Explorer Tab">🔍 Block Explorer</button>
+      <button class="tab-btn" data-tab="faucet" aria-label="Faucet & Wallet Tab">🚰 Faucet & Wallet</button>
+      <button class="tab-btn" data-tab="debugger" aria-label="Bitcoin Script Debugger Tab">📜 Script Debugger</button>
+      <button class="tab-btn" data-tab="txbuilder" aria-label="Transaction Builder Tab">💸 TX Builder & Decoder</button>
+      <button class="tab-btn" data-tab="diagnostics" aria-label="Node Diagnostics Tab">⚙️ C++ Diagnostics</button>
+    </nav>
+
+    <!-- Tab 1: Explorer -->
+    <section id="pane-explorer" class="tab-pane active">
+      <div class="card">
+        <div class="card-title">
+          <span>📦 Latest Testnet Blocks</span>
+          <button class="btn btn-secondary btn-sm" id="btnRefreshBlocks" aria-label="Refresh Blocks">🔄 Refresh</button>
+        </div>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>Height</th>
+                <th>Block Hash</th>
+                <th>Transactions</th>
+                <th>Size</th>
+                <th>Nonce</th>
+                <th>Timestamp</th>
+              </tr>
+            </thead>
+            <tbody id="blocksTableBody">
+              <tr><td colspan="6" style="text-align:center;">Loading blocks from C++ Core...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card" id="blockDetailCard" style="display:none;">
+        <div class="card-title">
+          <span>🔍 Block Inspection Details</span>
+          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('blockDetailCard').style.display='none'">✕ Close</button>
+        </div>
+        <pre class="code-box" id="blockDetailContent"></pre>
+      </div>
+    </section>
+
+    <!-- Tab 2: Faucet & Wallet -->
+    <section id="pane-faucet" class="tab-pane">
+      <div class="grid-2col">
+        <!-- Faucet Card -->
+        <div class="card">
+          <div class="card-title">🚰 Instant Testnet Faucet</div>
+          <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;">
+            Request free testnet satoshis to any Legacy, Native SegWit (<code>tb1q...</code>), or Taproot (<code>tb1p...</code>) address.
+          </p>
+          <div class="form-group">
+            <label for="faucetAddress">Recipient Testnet Address:</label>
+            <input type="text" id="faucetAddress" placeholder="e.g. tb1q908pkk7578p3lkl3d40p78c9e7d77c62031btest">
+          </div>
+          <div class="form-group">
+            <label for="faucetAmount">Amount (tBTC):</label>
+            <select id="faucetAmount">
+              <option value="100000000">1.0 tBTC (100,000,000 sats)</option>
+              <option value="50000000">0.5 tBTC (50,000,000 sats)</option>
+              <option value="250000000">2.5 tBTC (250,000,000 sats)</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" id="btnRequestFaucet" style="width: 100%;" aria-label="Request Satoshis">
+            ⚡ Dispense & Auto-Mine Block
+          </button>
+          <div id="faucetResult" style="margin-top: 1rem;"></div>
+        </div>
+
+        <!-- Wallet Generator Card -->
+        <div class="card">
+          <div class="card-title">
+            <span>🔑 Testnet Address Generator</span>
+            <button class="btn btn-secondary btn-sm" id="btnGenWallet" aria-label="Generate new wallet">🎲 Generate New</button>
+          </div>
+          <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;">
+            Generate cryptographic keypairs and valid Bitcoin Testnet addresses using C++ RIPEMD-160, SHA-256, and Bech32 encoding.
+          </p>
+          
+          <div class="form-group">
+            <label>Native SegWit Address (P2WPKH):</label>
+            <input type="text" id="genSegWit" readonly>
+          </div>
+          <div class="form-group">
+            <label>Taproot Address (P2TR):</label>
+            <input type="text" id="genTaproot" readonly>
+          </div>
+          <div class="form-group">
+            <label>Legacy Address (P2PKH):</label>
+            <input type="text" id="genLegacy" readonly>
+          </div>
+          <div class="form-group">
+            <label>Private Key (Testnet WIF):</label>
+            <input type="text" id="genWIF" readonly style="color: var(--color-purple);">
+          </div>
+          <button class="btn btn-secondary btn-sm" id="btnUseInFaucet" style="width:100%;" aria-label="Copy to faucet">
+            📋 Copy SegWit to Faucet Input
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 3: Bitcoin Script Debugger -->
+    <section id="pane-debugger" class="tab-pane">
+      <div class="card">
+        <div class="card-title">
+          <span>📜 Bitcoin Script Opcode Engine & Visual Debugger</span>
+          <select id="scriptPresets" style="width: auto; padding: 0.35rem 0.75rem;">
+            <option value="p2pkh">Preset: Standard P2PKH</option>
+            <option value="math">Preset: Arithmetic Math (OP_ADD, OP_SUB)</option>
+            <option value="hashlock">Preset: SHA-256 Hash Lock</option>
+            <option value="equalverify">Preset: Secret Preimage & OP_EQUALVERIFY</option>
+          </select>
+        </div>
+        <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;">
+          Step through Bitcoin Script opcodes simulated natively by the C++ engine. Inspect the stack before and after each opcode execution.
+        </p>
+
+        <div class="grid-2col">
+          <div>
+            <div class="form-group">
+              <label for="scriptCode">Script ASM (Space-separated opcodes and push data):</label>
+              <textarea id="scriptCode" placeholder="OP_DUP OP_HASH160 0x02a1b3... OP_EQUALVERIFY OP_CHECKSIG"></textarea>
+            </div>
+            <div class="form-group">
+              <label for="initialStack">Initial Stack (Optional, space-separated items):</label>
+              <input type="text" id="initialStack" placeholder="sig_3045... pubkey_02a1b3...">
+            </div>
+            <button class="btn btn-primary" id="btnEvalScript" style="width: 100%;" aria-label="Evaluate Script">
+              ▶️ Evaluate Script in C++ Engine
+            </button>
+          </div>
+
+          <div>
+            <label>Final Opcode Stack State:</label>
+            <div class="stack-visualizer" id="stackVisualizer">
+              <div style="color: var(--text-dim); text-align: center;">Stack is empty. Click evaluate to run.</div>
+            </div>
+            <div id="scriptResultStatus" style="margin-top: 1rem;"></div>
+          </div>
+        </div>
+
+        <div style="margin-top: 1.5rem;">
+          <label>Execution Trace & Step Analysis:</label>
+          <div id="scriptStepsContainer" style="margin-top: 0.5rem;"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 4: TX Builder & Decoder -->
+    <section id="pane-txbuilder" class="tab-pane">
+      <div class="grid-2col">
+        <!-- TX Builder -->
+        <div class="card">
+          <div class="card-title">💸 Broadcast Testnet Transaction</div>
+          <div class="form-group">
+            <label for="txFrom">Sender Address (Must have UTXOs):</label>
+            <input type="text" id="txFrom" placeholder="e.g. tb1q908pkk7578p3lkl3d40p78c9e7d77c62031btest">
+          </div>
+          <div class="form-group">
+            <label for="txTo">Recipient Address:</label>
+            <input type="text" id="txTo" placeholder="e.g. tb1qrecipient...">
+          </div>
+          <div class="form-group">
+            <label for="txAmount">Transfer Amount (Satoshis):</label>
+            <input type="number" id="txAmount" value="50000000" step="10000">
+          </div>
+          <button class="btn btn-primary" id="btnBroadcastTx" style="width: 100%;" aria-label="Broadcast Transaction">
+            🚀 Broadcast to Mempool
+          </button>
+          <div id="txBroadcastResult" style="margin-top: 1rem;"></div>
+        </div>
+
+        <!-- Raw Hex Decoder -->
+        <div class="card">
+          <div class="card-title">🔬 Raw Transaction Hex Decoder</div>
+          <div class="form-group">
+            <label for="rawHexInput">Raw Bitcoin Transaction Hex:</label>
+            <textarea id="rawHexInput" placeholder="02000000014a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b00000000..."></textarea>
+          </div>
+          <button class="btn btn-secondary" id="btnDecodeHex" style="width: 100%;" aria-label="Decode Hex">
+            🔍 Decode Raw Hex in C++
+          </button>
+          <div id="hexDecodeResult" style="margin-top: 1rem;"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tab 5: C++ Diagnostics -->
+    <section id="pane-diagnostics" class="tab-pane">
+      <div class="card">
+        <div class="card-title">
+          <span>⚙️ C++ Core Engine Diagnostics & SHA-256 Benchmark</span>
+          <button class="btn btn-primary btn-sm" id="btnRunBenchmarkAction" aria-label="Run Hashing Benchmark">
+            ⚡ Run 500,000 Hash Benchmark
+          </button>
+        </div>
+        <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1rem;">
+          Direct diagnostics and low-level performance evaluation of the compiled C++ Bitcoin Core binary.
+        </p>
+
+        <div class="grid-2col">
+          <div>
+            <label>Node Runtime Diagnostics:</label>
+            <pre class="code-box" id="nodeDiagJson">Loading diagnostics...</pre>
+          </div>
+          <div>
+            <label>C++ SHA-256 Benchmark Results:</label>
+            <pre class="code-box" id="benchResultJson">Click "Run 500,000 Hash Benchmark" to test C++ CPU performance.</pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <div class="footer-content">
+      <div>
+        <strong>Bitcoin Core C++ Testnet Suite</strong> • Developed by <a href="https://github.com/basantzp" style="color: var(--btc-gold); text-decoration:none;">Basant Pokhrel</a>
+      </div>
+      <div class="footer-links">
+        <a href="https://github.com/basantzp/bitcoin-testnet-cpp" target="_blank" rel="noopener">GitHub Repository</a>
+        <a href="https://github.com/basantzp" target="_blank" rel="noopener">Profile</a>
+        <a href="/robots.txt">robots.txt</a>
+        <a href="/sitemap.xml">sitemap.xml</a>
+      </div>
+    </div>
+  </footer>
+
+  <div id="toast"></div>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
