@@ -1,4 +1,5 @@
 {
+  "name": "bitcoin-testnet-bee",
   "version": 2,
   "public": true,
   "rewrites": [

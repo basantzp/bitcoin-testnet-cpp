@@ -1,7 +1,7 @@
 {
-  "name": "bitcoin-testnet-cpp",
+  "name": "bitcoin-testnet-bee",
   "version": "1.0.0",
-  "description": "High-Performance Bitcoin Core Testnet4 Suite and Explorer written in C++",
+  "description": "High-Performance Bitcoin Core Testnet4 Suite, Block Explorer & Script VM",
   "main": "api/index.js",
   "scripts": {
     "build": "make",
@@ -9,7 +9,10 @@
     "stop": "./scripts/stop.sh"
   },
   "dependencies": {
-    "express": "^4.19.2"
+    "express": "^4.22.2"
+  },
+  "devDependencies": {
+    "vercel": "^59.7.0"
   },
   "keywords": [
     "bitcoin",

@@ -7,3 +7,4 @@ src/*.o
 .bitcoin-testnet-cpp.pid
 node_modules/
 .DS_Store
+.vercel
