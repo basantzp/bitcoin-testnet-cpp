@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://bitcoin-testnet-cpp.vercel.app/sitemap.xml
+Sitemap: https://bitcointestnetbee.vercel.app/sitemap.xml
