@@ -1,5 +1,5 @@
 {
-  "name": "bitcoin-testnet-bee",
+  "name": "bitcointestnetbee",
   "version": "1.0.0",
   "description": "High-Performance Bitcoin Core Testnet4 Suite, Block Explorer & Script VM",
   "main": "api/index.js",
@@ -9,10 +9,10 @@
     "stop": "./scripts/stop.sh"
   },
   "dependencies": {
-    "express": "^4.22.2"
+    "express": "^4.19.2"
   },
   "devDependencies": {
-    "vercel": "^59.7.0"
+    "vercel": "^34.2.0"
   },
   "keywords": [
     "bitcoin",
