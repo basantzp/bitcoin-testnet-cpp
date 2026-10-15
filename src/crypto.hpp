@@ -44,6 +44,11 @@ struct TestnetWallet {
     std::string taproot_address; // tb1p... (Testnet Taproot P2TR)
 };
 
+// secp256k1 Elliptic Curve Cryptography (Bitcoin native curve)
+std::vector<uint8_t> derive_public_key(const std::vector<uint8_t>& privkey, bool compressed = true);
+std::vector<uint8_t> ecdsa_sign(const std::vector<uint8_t>& privkey, const std::vector<uint8_t>& message_hash);
+bool ecdsa_verify(const std::vector<uint8_t>& pubkey, const std::vector<uint8_t>& message_hash, const std::vector<uint8_t>& signature_der);
+
 TestnetWallet generate_testnet_wallet();
 
 } // namespace btc::crypto

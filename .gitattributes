@@ -1,0 +1,6 @@
+# Linguist language overrides
+api/* linguist-documentation
+public/* linguist-documentation
+*.html linguist-documentation
+*.json linguist-documentation
+package-lock.json linguist-vendored

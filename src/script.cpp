@@ -24,8 +24,23 @@ static int64_t parse_num(const std::string& s) {
     }
 }
 
+struct ConditionalBranch {
+    bool fExec;
+    bool fElseSeen;
+};
+
 static bool is_truthy(const std::string& s) {
-    if (s.empty() || s == "0" || s == "00") return false;
+    if (s.empty() || s == "0" || s == "00" || s == "-0") return false;
+    auto b = crypto::hex_to_bytes(s);
+    if (!b.empty()) {
+        for (size_t i = 0; i < b.size(); ++i) {
+            if (b[i] != 0) {
+                if (i == b.size() - 1 && b[i] == 0x80) return false;
+                return true;
+            }
+        }
+        return false;
+    }
     return true;
 }
 
@@ -36,9 +51,9 @@ static std::vector<uint8_t> get_item_bytes(const std::string& item) {
     return std::vector<uint8_t>(item.begin(), item.end());
 }
 
-static bool is_executing(const std::vector<bool>& vfExec) {
-    for (bool b : vfExec) {
-        if (!b) return false;
+static bool is_executing(const std::vector<ConditionalBranch>& vfExec) {
+    for (const auto& branch : vfExec) {
+        if (!branch.fExec) return false;
     }
     return true;
 }
@@ -51,7 +66,7 @@ ScriptResult evaluate_script(const std::string& script_asm, const std::vector<st
     
     std::vector<std::string> stack = initial_stack;
     auto tokens = tokenize(script_asm);
-    std::vector<bool> vfExec;
+    std::vector<ConditionalBranch> vfExec;
     
     int step_counter = 1;
     
@@ -72,21 +87,23 @@ ScriptResult evaluate_script(const std::string& script_asm, const std::vector<st
                     std::string val = stack.back(); stack.pop_back();
                     bool cond = is_truthy(val);
                     if (op == "OP_NOTIF") cond = !cond;
-                    vfExec.push_back(cond);
+                    vfExec.push_back({cond, false});
                 } else {
-                    vfExec.push_back(false);
+                    vfExec.push_back({false, false});
                 }
                 step.stack_after = stack;
                 result.steps.push_back(step);
                 continue;
             } else if (op == "OP_ELSE") {
                 if (vfExec.empty()) throw std::runtime_error("OP_ELSE encountered without matching OP_IF");
+                if (vfExec.back().fElseSeen) throw std::runtime_error("Duplicate OP_ELSE in same conditional block");
+                vfExec.back().fElseSeen = true;
                 bool parent_exec = true;
                 for (size_t k = 0; k + 1 < vfExec.size(); ++k) {
-                    if (!vfExec[k]) { parent_exec = false; break; }
+                    if (!vfExec[k].fExec) { parent_exec = false; break; }
                 }
                 if (parent_exec) {
-                    vfExec.back() = !vfExec.back();
+                    vfExec.back().fExec = !vfExec.back().fExec;
                 }
                 step.stack_after = stack;
                 result.steps.push_back(step);
@@ -167,7 +184,8 @@ ScriptResult evaluate_script(const std::string& script_asm, const std::vector<st
                 stack.push_back(std::to_string(stack.size()));
             } else if (op == "OP_SIZE") {
                 if (stack.empty()) throw std::runtime_error("Stack underflow on OP_SIZE");
-                stack.push_back(std::to_string(stack.back().size()));
+                auto bytes = get_item_bytes(stack.back());
+                stack.push_back(std::to_string(bytes.size()));
             } else if (op == "OP_PICK") {
                 if (stack.empty()) throw std::runtime_error("Stack underflow on OP_PICK");
                 int64_t n = parse_num(stack.back()); stack.pop_back();
@@ -222,37 +240,61 @@ ScriptResult evaluate_script(const std::string& script_asm, const std::vector<st
                 auto bytes = get_item_bytes(item);
                 auto h2 = crypto::hash256_hex(std::string(bytes.begin(), bytes.end()));
                 stack.push_back(h2);
-            } else if (op == "OP_CHECKSIG") {
-                if (stack.size() < 2) throw std::runtime_error("Stack underflow on OP_CHECKSIG");
+            } else if (op == "OP_CHECKSIG" || op == "OP_CHECKSIGVERIFY") {
+                if (stack.size() < 2) throw std::runtime_error("Stack underflow on " + op);
                 auto pubkey = stack.back(); stack.pop_back();
                 auto sig = stack.back(); stack.pop_back();
-                bool valid_sig = (!sig.empty() && !pubkey.empty() && sig != "0");
-                stack.push_back(valid_sig ? "1" : "0");
-            } else if (op == "OP_CHECKMULTISIG") {
-                if (stack.empty()) throw std::runtime_error("Stack underflow on OP_CHECKMULTISIG");
+                bool valid_sig = false;
+                auto pub_bytes = crypto::hex_to_bytes(pubkey);
+                auto sig_bytes = crypto::hex_to_bytes(sig);
+                if ((pub_bytes.size() == 33 || pub_bytes.size() == 65) && sig_bytes.size() >= 8 && sig_bytes[0] == 0x30) {
+                    // Cryptographic ECDSA secp256k1 verification
+                    auto msg_hash = crypto::sha256_bytes(pub_bytes);
+                    valid_sig = crypto::ecdsa_verify(pub_bytes, msg_hash, sig_bytes);
+                } else {
+                    valid_sig = (!sig.empty() && !pubkey.empty() && sig != "0");
+                }
+                if (op == "OP_CHECKSIGVERIFY") {
+                    if (!valid_sig) throw std::runtime_error("OP_CHECKSIGVERIFY failed: signature verification failed");
+                } else {
+                    stack.push_back(valid_sig ? "1" : "0");
+                }
+            } else if (op == "OP_CHECKMULTISIG" || op == "OP_CHECKMULTISIGVERIFY") {
+                if (stack.empty()) throw std::runtime_error("Stack underflow on " + op);
                 int64_t n_keys = parse_num(stack.back()); stack.pop_back();
-                if (n_keys < 0 || (size_t)n_keys > stack.size()) throw std::runtime_error("Invalid public key count in OP_CHECKMULTISIG");
+                if (n_keys < 0 || n_keys > 20 || (size_t)n_keys > stack.size()) {
+                    throw std::runtime_error("Invalid public key count in " + op + " (max 20)");
+                }
                 std::vector<std::string> pubkeys;
                 for (int64_t k = 0; k < n_keys; ++k) {
                     pubkeys.push_back(stack.back()); stack.pop_back();
                 }
                 std::reverse(pubkeys.begin(), pubkeys.end());
-                if (stack.empty()) throw std::runtime_error("Stack underflow for signature count in OP_CHECKMULTISIG");
+                if (stack.empty()) throw std::runtime_error("Stack underflow for signature count in " + op);
                 int64_t m_sigs = parse_num(stack.back()); stack.pop_back();
-                if (m_sigs < 0 || m_sigs > n_keys || (size_t)m_sigs > stack.size()) throw std::runtime_error("Invalid signature count in OP_CHECKMULTISIG");
+                if (m_sigs < 0 || m_sigs > n_keys || (size_t)m_sigs > stack.size()) {
+                    throw std::runtime_error("Invalid signature count in " + op + " (m must be between 0 and n)");
+                }
                 std::vector<std::string> sigs;
                 for (int64_t k = 0; k < m_sigs; ++k) {
                     sigs.push_back(stack.back()); stack.pop_back();
                 }
                 std::reverse(sigs.begin(), sigs.end());
-                // Bitcoin dummy element (off-by-one bug requirement)
-                if (stack.empty()) throw std::runtime_error("Missing dummy element for OP_CHECKMULTISIG");
-                stack.pop_back();
+                // Bitcoin dummy element (off-by-one bug requirement, BIP-147 NULLDUMMY)
+                if (stack.empty()) throw std::runtime_error("Missing dummy element for " + op);
+                std::string dummy = stack.back(); stack.pop_back();
+                if (is_truthy(dummy)) {
+                    throw std::runtime_error(op + " failed: BIP-147 NULLDUMMY violation (dummy element must be null/empty/0)");
+                }
                 bool multisig_ok = true;
                 for (const auto& s : sigs) {
                     if (s.empty() || s == "0") { multisig_ok = false; break; }
                 }
-                stack.push_back(multisig_ok ? "1" : "0");
+                if (op == "OP_CHECKMULTISIGVERIFY") {
+                    if (!multisig_ok) throw std::runtime_error("OP_CHECKMULTISIGVERIFY failed: signatures did not verify");
+                } else {
+                    stack.push_back(multisig_ok ? "1" : "0");
+                }
             }
             // Timelocks
             else if (op == "OP_CHECKLOCKTIMEVERIFY") {
@@ -295,12 +337,12 @@ ScriptResult evaluate_script(const std::string& script_asm, const std::vector<st
                 stack.push_back(std::to_string(std::abs(v)));
             } else if (op == "OP_NOT") {
                 if (stack.empty()) throw std::runtime_error("Stack underflow on OP_NOT");
-                int64_t v = parse_num(stack.back()); stack.pop_back();
-                stack.push_back(v == 0 ? "1" : "0");
+                std::string item = stack.back(); stack.pop_back();
+                stack.push_back(is_truthy(item) ? "0" : "1");
             } else if (op == "OP_0NOTEQUAL") {
                 if (stack.empty()) throw std::runtime_error("Stack underflow on OP_0NOTEQUAL");
-                int64_t v = parse_num(stack.back()); stack.pop_back();
-                stack.push_back(v != 0 ? "1" : "0");
+                std::string item = stack.back(); stack.pop_back();
+                stack.push_back(is_truthy(item) ? "1" : "0");
             } else if (op == "OP_NUMEQUAL") {
                 if (stack.size() < 2) throw std::runtime_error("Stack underflow on OP_NUMEQUAL");
                 int64_t b = parse_num(stack.back()); stack.pop_back();
@@ -354,14 +396,14 @@ ScriptResult evaluate_script(const std::string& script_asm, const std::vector<st
                 stack.push_back((min_val <= x_val && x_val < max_val) ? "1" : "0");
             } else if (op == "OP_BOOLAND") {
                 if (stack.size() < 2) throw std::runtime_error("Stack underflow on OP_BOOLAND");
-                int64_t b = parse_num(stack.back()); stack.pop_back();
-                int64_t a = parse_num(stack.back()); stack.pop_back();
-                stack.push_back((a != 0 && b != 0) ? "1" : "0");
+                std::string b_str = stack.back(); stack.pop_back();
+                std::string a_str = stack.back(); stack.pop_back();
+                stack.push_back((is_truthy(a_str) && is_truthy(b_str)) ? "1" : "0");
             } else if (op == "OP_BOOLOR") {
                 if (stack.size() < 2) throw std::runtime_error("Stack underflow on OP_BOOLOR");
-                int64_t b = parse_num(stack.back()); stack.pop_back();
-                int64_t a = parse_num(stack.back()); stack.pop_back();
-                stack.push_back((a != 0 || b != 0) ? "1" : "0");
+                std::string b_str = stack.back(); stack.pop_back();
+                std::string a_str = stack.back(); stack.pop_back();
+                stack.push_back((is_truthy(a_str) || is_truthy(b_str)) ? "1" : "0");
             } else if (op == "OP_RETURN") {
                 throw std::runtime_error("OP_RETURN executed (Provably unspendable output / Data Carrier)");
             } else {

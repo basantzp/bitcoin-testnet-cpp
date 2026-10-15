@@ -3,11 +3,18 @@
 #include <openssl/ripemd.h>
 #include <openssl/rand.h>
 #include <openssl/evp.h>
+#include <openssl/ec.h>
+#include <openssl/obj_mac.h>
+#include <openssl/bn.h>
+#include <openssl/ecdsa.h>
 #include <sstream>
 #include <iomanip>
 #include <algorithm>
 #include <stdexcept>
 #include <array>
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 
 namespace btc::crypto {
 
@@ -205,6 +212,96 @@ std::string bech32_encode(const std::string& hrp, int witness_version, const std
     return ret;
 }
 
+std::vector<uint8_t> derive_public_key(const std::vector<uint8_t>& privkey, bool compressed) {
+    if (privkey.size() != 32) return {};
+    
+    EC_KEY* key = EC_KEY_new_by_curve_name(NID_secp256k1);
+    if (!key) return {};
+    
+    BIGNUM* bn = BN_bin2bn(privkey.data(), privkey.size(), NULL);
+    if (!bn) {
+        EC_KEY_free(key);
+        return {};
+    }
+    
+    if (!EC_KEY_set_private_key(key, bn)) {
+        BN_free(bn);
+        EC_KEY_free(key);
+        return {};
+    }
+    
+    const EC_GROUP* group = EC_KEY_get0_group(key);
+    EC_POINT* pub_point = EC_POINT_new(group);
+    if (!pub_point) {
+        BN_free(bn);
+        EC_KEY_free(key);
+        return {};
+    }
+    
+    if (!EC_POINT_mul(group, pub_point, bn, NULL, NULL, NULL)) {
+        EC_POINT_free(pub_point);
+        BN_free(bn);
+        EC_KEY_free(key);
+        return {};
+    }
+    
+    EC_KEY_set_public_key(key, pub_point);
+    
+    point_conversion_form_t form = compressed ? POINT_CONVERSION_COMPRESSED : POINT_CONVERSION_UNCOMPRESSED;
+    size_t pub_len = EC_POINT_point2oct(group, pub_point, form, NULL, 0, NULL);
+    std::vector<uint8_t> pub(pub_len);
+    EC_POINT_point2oct(group, pub_point, form, pub.data(), pub.size(), NULL);
+    
+    EC_POINT_free(pub_point);
+    BN_free(bn);
+    EC_KEY_free(key);
+    return pub;
+}
+
+std::vector<uint8_t> ecdsa_sign(const std::vector<uint8_t>& privkey, const std::vector<uint8_t>& message_hash) {
+    if (privkey.size() != 32 || message_hash.empty()) return {};
+    
+    EC_KEY* key = EC_KEY_new_by_curve_name(NID_secp256k1);
+    if (!key) return {};
+    
+    BIGNUM* bn = BN_bin2bn(privkey.data(), privkey.size(), NULL);
+    if (!bn) {
+        EC_KEY_free(key);
+        return {};
+    }
+    EC_KEY_set_private_key(key, bn);
+    
+    unsigned int sig_len = ECDSA_size(key);
+    std::vector<uint8_t> sig(sig_len);
+    if (!ECDSA_sign(0, message_hash.data(), message_hash.size(), sig.data(), &sig_len, key)) {
+        BN_free(bn);
+        EC_KEY_free(key);
+        return {};
+    }
+    sig.resize(sig_len);
+    
+    BN_free(bn);
+    EC_KEY_free(key);
+    return sig;
+}
+
+bool ecdsa_verify(const std::vector<uint8_t>& pubkey, const std::vector<uint8_t>& message_hash, const std::vector<uint8_t>& signature_der) {
+    if (pubkey.empty() || message_hash.empty() || signature_der.empty()) return false;
+    
+    EC_KEY* key = EC_KEY_new_by_curve_name(NID_secp256k1);
+    if (!key) return false;
+    
+    const unsigned char* p = pubkey.data();
+    if (!o2i_ECPublicKey(&key, &p, pubkey.size())) {
+        EC_KEY_free(key);
+        return false;
+    }
+    
+    int ok = ECDSA_verify(0, message_hash.data(), message_hash.size(), signature_der.data(), signature_der.size(), key);
+    EC_KEY_free(key);
+    return (ok == 1);
+}
+
 TestnetWallet generate_testnet_wallet() {
     TestnetWallet wallet;
     
@@ -217,12 +314,11 @@ TestnetWallet generate_testnet_wallet() {
     wif_payload.push_back(0x01);
     wallet.private_key_wif = base58check_encode(0xef, wif_payload);
     
-    // 2. Generate Simulated Compressed Public Key (33 bytes: 0x02/0x03 + 32-byte X coordinate)
-    // For testnet simulator, we derive a deterministic public key hash
-    auto pub_hash = sha256_bytes(priv_bytes);
-    std::vector<uint8_t> pub_key;
-    pub_key.push_back((pub_hash[0] % 2 == 0) ? 0x02 : 0x03);
-    pub_key.insert(pub_key.end(), pub_hash.begin(), pub_hash.end());
+    // 2. Generate Real secp256k1 Compressed Public Key (33 bytes) via EC scalar multiplication Q = d * G
+    auto pub_key = derive_public_key(priv_bytes, true);
+    if (pub_key.empty()) {
+        throw std::runtime_error("Failed to derive secp256k1 public key");
+    }
     wallet.public_key_hex = bytes_to_hex(pub_key);
     
     // 3. Compute Hash160 (RIPEMD160(SHA256(pubkey)))
@@ -237,9 +333,13 @@ TestnetWallet generate_testnet_wallet() {
     wallet.segwit_address = bech32_encode("tb", 0, hash160_bytes);
     
     // 6. Testnet Taproot Address (hrp "tb", witness version 1, 32-byte X-only pubkey -> tb1p...)
-    wallet.taproot_address = bech32_encode("tb", 1, pub_hash);
+    // In BIP-340/341, the Taproot internal key is the 32-byte X coordinate (skipping the 0x02/0x03 prefix byte)
+    std::vector<uint8_t> x_only_pub(pub_key.begin() + 1, pub_key.end());
+    wallet.taproot_address = bech32_encode("tb", 1, x_only_pub);
     
     return wallet;
 }
 
 } // namespace btc::crypto
+
+#pragma GCC diagnostic pop

@@ -12,10 +12,39 @@ using json = nlohmann::json;
 
 int main(int argc, char* argv[]) {
     int port = 8332; // Standard Bitcoin RPC / Testnet Core default port
+
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--help" || arg == "-h") {
+            std::cout << "Bitcoin Core Testnet4 Suite & Script VM Engine\n"
+                      << "Usage: bitcoin-testnet-core [PORT]\n"
+                      << "       bitcoin-testnet-core -p <PORT>\n\n"
+                      << "Options:\n"
+                      << "  -h, --help        Display this help message and exit\n"
+                      << "  -p, --port <PORT> Port to bind HTTP / RPC server (default: 8332 or $PORT)\n";
+            return 0;
+        } else if ((arg == "-p" || arg == "--port") && i + 1 < argc) {
+            try {
+                port = std::stoi(argv[++i]);
+            } catch (...) {
+                std::cerr << "Error: Invalid port number: " << argv[i] << std::endl;
+                return 1;
+            }
+        } else {
+            try {
+                port = std::stoi(arg);
+            } catch (...) {
+                std::cerr << "Error: Invalid port number or argument: " << arg << "\n"
+                          << "Run with --help for usage instructions." << std::endl;
+                return 1;
+            }
+        }
+    }
+
     if (const char* env_port = std::getenv("PORT")) {
-        port = std::stoi(env_port);
-    } else if (argc > 1) {
-        port = std::stoi(argv[1]);
+        try {
+            port = std::stoi(env_port);
+        } catch (...) {}
     }
 
     auto node = std::make_shared<btc::chain::BitcoinTestnetNode>();

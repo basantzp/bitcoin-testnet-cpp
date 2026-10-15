@@ -148,131 +148,192 @@ app.post('/api/script/eval', (req, res) => {
       continue;
     }
 
-    // Active execution
-    if (op === "OP_DUP") {
-      if (currentStack.length > 0) currentStack.push(currentStack[currentStack.length - 1]);
-    } else if (op === "OP_2DUP") {
-      if (currentStack.length >= 2) {
+    try {
+      // Active execution
+      if (op === "OP_DUP") {
+        if (currentStack.length < 1) throw new Error("Stack underflow on OP_DUP");
+        currentStack.push(currentStack[currentStack.length - 1]);
+      } else if (op === "OP_2DUP") {
+        if (currentStack.length < 2) throw new Error("Stack underflow on OP_2DUP");
         currentStack.push(currentStack[currentStack.length - 2]);
         currentStack.push(currentStack[currentStack.length - 2]);
-      }
-    } else if (op === "OP_DROP") {
-      if (currentStack.length > 0) currentStack.pop();
-    } else if (op === "OP_2DROP") {
-      if (currentStack.length >= 2) { currentStack.pop(); currentStack.pop(); }
-    } else if (op === "OP_SWAP") {
-      if (currentStack.length >= 2) {
+      } else if (op === "OP_DROP") {
+        if (currentStack.length < 1) throw new Error("Stack underflow on OP_DROP");
+        currentStack.pop();
+      } else if (op === "OP_2DROP") {
+        if (currentStack.length < 2) throw new Error("Stack underflow on OP_2DROP");
+        currentStack.pop(); currentStack.pop();
+      } else if (op === "OP_SWAP") {
+        if (currentStack.length < 2) throw new Error("Stack underflow on OP_SWAP");
         const a = currentStack[currentStack.length - 1];
         currentStack[currentStack.length - 1] = currentStack[currentStack.length - 2];
         currentStack[currentStack.length - 2] = a;
-      }
-    } else if (op === "OP_OVER") {
-      if (currentStack.length >= 2) currentStack.push(currentStack[currentStack.length - 2]);
-    } else if (op === "OP_NIP") {
-      if (currentStack.length >= 2) currentStack.splice(currentStack.length - 2, 1);
-    } else if (op === "OP_TUCK") {
-      if (currentStack.length >= 2) {
+      } else if (op === "OP_OVER") {
+        if (currentStack.length < 2) throw new Error("Stack underflow on OP_OVER");
+        currentStack.push(currentStack[currentStack.length - 2]);
+      } else if (op === "OP_NIP") {
+        if (currentStack.length < 2) throw new Error("Stack underflow on OP_NIP");
+        currentStack.splice(currentStack.length - 2, 1);
+      } else if (op === "OP_TUCK") {
+        if (currentStack.length < 2) throw new Error("Stack underflow on OP_TUCK");
         currentStack.splice(currentStack.length - 2, 0, currentStack[currentStack.length - 1]);
-      }
-    } else if (op === "OP_DEPTH") {
-      currentStack.push(String(currentStack.length));
-    } else if (op === "OP_SIZE") {
-      if (currentStack.length > 0) currentStack.push(String(currentStack[currentStack.length - 1].length));
-    } else if (op === "OP_HASH160") {
-      if (currentStack.length > 0) {
+      } else if (op === "OP_DEPTH") {
+        currentStack.push(String(currentStack.length));
+      } else if (op === "OP_SIZE") {
+        if (currentStack.length < 1) throw new Error("Stack underflow on OP_SIZE");
+        const top = currentStack[currentStack.length - 1];
+        const isHex = /^[0-9a-fA-F]+$/.test(top) && top.length % 2 === 0;
+        currentStack.push(String(isHex ? top.length / 2 : top.length));
+      } else if (op === "OP_HASH160") {
+        if (currentStack.length < 1) throw new Error("Stack underflow on OP_HASH160");
         const item = currentStack.pop();
-        currentStack.push(crypto.createHash('ripemd160').update(crypto.createHash('sha256').update(item).digest()).digest('hex'));
-      }
-    } else if (op === "OP_SHA256") {
-      if (currentStack.length > 0) {
+        const buf = (/^[0-9a-fA-F]+$/.test(item) && item.length % 2 === 0) ? Buffer.from(item, 'hex') : Buffer.from(item, 'utf8');
+        currentStack.push(crypto.createHash('ripemd160').update(crypto.createHash('sha256').update(buf).digest()).digest('hex'));
+      } else if (op === "OP_SHA256") {
+        if (currentStack.length < 1) throw new Error("Stack underflow on OP_SHA256");
         const item = currentStack.pop();
-        currentStack.push(crypto.createHash('sha256').update(item).digest('hex'));
-      }
-    } else if (op === "OP_HASH256") {
-      if (currentStack.length > 0) {
+        const buf = (/^[0-9a-fA-F]+$/.test(item) && item.length % 2 === 0) ? Buffer.from(item, 'hex') : Buffer.from(item, 'utf8');
+        currentStack.push(crypto.createHash('sha256').update(buf).digest('hex'));
+      } else if (op === "OP_HASH256") {
+        if (currentStack.length < 1) throw new Error("Stack underflow on OP_HASH256");
         const item = currentStack.pop();
-        const h1 = crypto.createHash('sha256').update(item).digest();
+        const buf = (/^[0-9a-fA-F]+$/.test(item) && item.length % 2 === 0) ? Buffer.from(item, 'hex') : Buffer.from(item, 'utf8');
+        const h1 = crypto.createHash('sha256').update(buf).digest();
         currentStack.push(crypto.createHash('sha256').update(h1).digest('hex'));
-      }
-    } else if (op === "OP_RIPEMD160") {
-      if (currentStack.length > 0) {
+      } else if (op === "OP_RIPEMD160") {
+        if (currentStack.length < 1) throw new Error("Stack underflow on OP_RIPEMD160");
         const item = currentStack.pop();
-        currentStack.push(crypto.createHash('ripemd160').update(item).digest('hex'));
-      }
-    } else if (op === "OP_EQUALVERIFY" || op === "OP_EQUAL" || op === "OP_NUMEQUAL") {
-      if (currentStack.length >= 2) {
+        const buf = (/^[0-9a-fA-F]+$/.test(item) && item.length % 2 === 0) ? Buffer.from(item, 'hex') : Buffer.from(item, 'utf8');
+        currentStack.push(crypto.createHash('ripemd160').update(buf).digest('hex'));
+      } else if (op === "OP_EQUAL" || op === "OP_NUMEQUAL") {
+        if (currentStack.length < 2) throw new Error("Stack underflow on " + op);
         const a = currentStack.pop();
         const b = currentStack.pop();
         currentStack.push(a === b ? "1" : "0");
-      }
-    } else if (op === "OP_NUMNOTEQUAL") {
-      if (currentStack.length >= 2) {
+      } else if (op === "OP_EQUALVERIFY") {
+        if (currentStack.length < 2) throw new Error("Stack underflow on OP_EQUALVERIFY");
+        const a = currentStack.pop();
+        const b = currentStack.pop();
+        if (a !== b) throw new Error("OP_EQUALVERIFY failed: items do not match");
+      } else if (op === "OP_NUMEQUALVERIFY") {
+        if (currentStack.length < 2) throw new Error("Stack underflow on OP_NUMEQUALVERIFY");
+        const a = parseInt(currentStack.pop(), 10);
+        const b = parseInt(currentStack.pop(), 10);
+        if (a !== b) throw new Error("OP_NUMEQUALVERIFY failed: operands not equal");
+      } else if (op === "OP_NUMNOTEQUAL") {
+        if (currentStack.length < 2) throw new Error("Stack underflow on OP_NUMNOTEQUAL");
         const a = currentStack.pop();
         const b = currentStack.pop();
         currentStack.push(a !== b ? "1" : "0");
-      }
-    } else if (op === "OP_CHECKSIG") {
-      if (currentStack.length >= 2) {
-        currentStack.pop();
-        currentStack.pop();
-        currentStack.push("1");
-      }
-    } else if (op === "OP_CHECKMULTISIG") {
-      if (currentStack.length > 0) {
+      } else if (op === "OP_VERIFY") {
+        if (currentStack.length < 1) throw new Error("Stack underflow on OP_VERIFY");
+        const top = currentStack.pop();
+        if (!isTruthy(top)) throw new Error("OP_VERIFY failed: top stack item is false/zero");
+      } else if (op === "OP_CHECKSIG" || op === "OP_CHECKSIGVERIFY") {
+        if (currentStack.length < 2) throw new Error("Stack underflow on " + op);
+        const pub = currentStack.pop();
+        const sig = currentStack.pop();
+        const valid = (!sig || sig === "0" || !pub) ? false : true;
+        if (op === "OP_CHECKSIGVERIFY") {
+          if (!valid) throw new Error("OP_CHECKSIGVERIFY failed: signature verification failed");
+        } else {
+          currentStack.push(valid ? "1" : "0");
+        }
+      } else if (op === "OP_CHECKMULTISIG" || op === "OP_CHECKMULTISIGVERIFY") {
+        if (currentStack.length < 1) throw new Error("Stack underflow on " + op);
         const n = parseInt(currentStack.pop(), 10) || 0;
+        if (n < 0 || n > 20 || currentStack.length < n) throw new Error("Invalid public key count in " + op);
         for (let k = 0; k < n; k++) currentStack.pop();
+        if (currentStack.length < 1) throw new Error("Stack underflow for sig count in " + op);
         const m = parseInt(currentStack.pop(), 10) || 0;
+        if (m < 0 || m > n || currentStack.length < m) throw new Error("Invalid signature count in " + op);
         for (let k = 0; k < m; k++) currentStack.pop();
-        currentStack.pop(); // dummy element
-        currentStack.push("1");
-      }
-    } else if (op === "OP_CHECKLOCKTIMEVERIFY" || op === "OP_CHECKSEQUENCEVERIFY" || op === "OP_NOP") {
-      // Validates and preserves stack
-    } else if (op === "OP_ADD") {
-      if (currentStack.length >= 2) {
+        if (currentStack.length < 1) throw new Error("Missing dummy element for " + op);
+        const dummy = currentStack.pop();
+        if (isTruthy(dummy)) throw new Error(op + " failed: BIP-147 NULLDUMMY violation");
+        if (op === "OP_CHECKMULTISIGVERIFY") {
+          // Leaves stack clean
+        } else {
+          currentStack.push("1");
+        }
+      } else if (op === "OP_CHECKLOCKTIMEVERIFY" || op === "OP_CHECKSEQUENCEVERIFY" || op === "OP_NOP") {
+        // Validates and preserves stack
+      } else if (op === "OP_ADD") {
+        if (currentStack.length < 2) throw new Error("Stack underflow on OP_ADD");
         const b = parseInt(currentStack.pop(), 10) || 0;
         const a = parseInt(currentStack.pop(), 10) || 0;
         currentStack.push(String(a + b));
-      }
-    } else if (op === "OP_SUB") {
-      if (currentStack.length >= 2) {
+      } else if (op === "OP_SUB") {
+        if (currentStack.length < 2) throw new Error("Stack underflow on OP_SUB");
         const b = parseInt(currentStack.pop(), 10) || 0;
         const a = parseInt(currentStack.pop(), 10) || 0;
         currentStack.push(String(a - b));
-      }
-    } else if (op === "OP_1ADD") {
-      if (currentStack.length >= 1) currentStack.push(String((parseInt(currentStack.pop(), 10) || 0) + 1));
-    } else if (op === "OP_1SUB") {
-      if (currentStack.length >= 1) currentStack.push(String((parseInt(currentStack.pop(), 10) || 0) - 1));
-    } else if (op === "OP_MIN") {
-      if (currentStack.length >= 2) {
+      } else if (op === "OP_1ADD") {
+        if (currentStack.length < 1) throw new Error("Stack underflow on OP_1ADD");
+        currentStack.push(String((parseInt(currentStack.pop(), 10) || 0) + 1));
+      } else if (op === "OP_1SUB") {
+        if (currentStack.length < 1) throw new Error("Stack underflow on OP_1SUB");
+        currentStack.push(String((parseInt(currentStack.pop(), 10) || 0) - 1));
+      } else if (op === "OP_NOT") {
+        if (currentStack.length < 1) throw new Error("Stack underflow on OP_NOT");
+        const v = currentStack.pop();
+        currentStack.push(isTruthy(v) ? "0" : "1");
+      } else if (op === "OP_0NOTEQUAL") {
+        if (currentStack.length < 1) throw new Error("Stack underflow on OP_0NOTEQUAL");
+        const v = currentStack.pop();
+        currentStack.push(isTruthy(v) ? "1" : "0");
+      } else if (op === "OP_BOOLAND") {
+        if (currentStack.length < 2) throw new Error("Stack underflow on OP_BOOLAND");
+        const b = currentStack.pop();
+        const a = currentStack.pop();
+        currentStack.push(isTruthy(a) && isTruthy(b) ? "1" : "0");
+      } else if (op === "OP_BOOLOR") {
+        if (currentStack.length < 2) throw new Error("Stack underflow on OP_BOOLOR");
+        const b = currentStack.pop();
+        const a = currentStack.pop();
+        currentStack.push(isTruthy(a) || isTruthy(b) ? "1" : "0");
+      } else if (op === "OP_MIN") {
+        if (currentStack.length < 2) throw new Error("Stack underflow on OP_MIN");
         const b = parseInt(currentStack.pop(), 10) || 0;
         const a = parseInt(currentStack.pop(), 10) || 0;
         currentStack.push(String(Math.min(a, b)));
-      }
-    } else if (op === "OP_MAX") {
-      if (currentStack.length >= 2) {
+      } else if (op === "OP_MAX") {
+        if (currentStack.length < 2) throw new Error("Stack underflow on OP_MAX");
         const b = parseInt(currentStack.pop(), 10) || 0;
         const a = parseInt(currentStack.pop(), 10) || 0;
         currentStack.push(String(Math.max(a, b)));
-      }
-    } else if (op === "OP_WITHIN") {
-      if (currentStack.length >= 3) {
+      } else if (op === "OP_WITHIN") {
+        if (currentStack.length < 3) throw new Error("Stack underflow on OP_WITHIN");
         const max = parseInt(currentStack.pop(), 10) || 0;
         const min = parseInt(currentStack.pop(), 10) || 0;
         const x = parseInt(currentStack.pop(), 10) || 0;
         currentStack.push(min <= x && x < max ? "1" : "0");
+      } else if (op === "OP_0" || op === "0") {
+        currentStack.push("0");
+      } else if (op === "OP_1" || op === "1" || op === "OP_TRUE") {
+        currentStack.push("1");
+      } else if (op.startsWith("OP_") && !isNaN(Number(op.slice(3)))) {
+        currentStack.push(op.slice(3));
+      } else {
+        let pushVal = op;
+        if (pushVal.startsWith("<") && pushVal.endsWith(">")) pushVal = pushVal.slice(1, -1);
+        currentStack.push(pushVal);
       }
-    } else if (op === "OP_0" || op === "0") {
-      currentStack.push("0");
-    } else if (op === "OP_1" || op === "1" || op === "OP_TRUE") {
-      currentStack.push("1");
-    } else if (op.startsWith("OP_") && !isNaN(Number(op.slice(3)))) {
-      currentStack.push(op.slice(3));
-    } else {
-      let pushVal = op;
-      if (pushVal.startsWith("<") && pushVal.endsWith(">")) pushVal = pushVal.slice(1, -1);
-      currentStack.push(pushVal);
+    } catch (err) {
+      steps.push({
+        step_index: i + 1,
+        opcode: op,
+        stack_before: before,
+        stack_after: [...currentStack],
+        success: false,
+        error_message: err.message
+      });
+      return res.json({
+        valid: false,
+        final_status: "SCRIPT_ERROR: " + err.message,
+        final_stack: currentStack,
+        steps
+      });
     }
 
     steps.push({
