@@ -55,12 +55,15 @@ std::vector<uint8_t> hex_to_bytes(const std::string& hex) {
     if (clean.rfind("0x", 0) == 0 || clean.rfind("0X", 0) == 0) {
         clean = clean.substr(2);
     }
+    if (clean.empty() || !std::all_of(clean.begin(), clean.end(), ::isxdigit)) {
+        return {};
+    }
     if (clean.length() % 2 != 0) {
         clean = "0" + clean;
     }
     for (size_t i = 0; i < clean.length(); i += 2) {
         std::string byteString = clean.substr(i, 2);
-        uint8_t byte = (uint8_t)strtol(byteString.c_str(), nullptr, 16);
+        uint8_t byte = (uint8_t)strtoul(byteString.c_str(), nullptr, 16);
         bytes.push_back(byte);
     }
     return bytes;

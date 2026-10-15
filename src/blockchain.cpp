@@ -434,7 +434,6 @@ Transaction BitcoinTestnetNode::create_and_broadcast_tx(const std::string& from_
         change_out.address = from_addr;
         change_out.script_pubkey = "0014" + crypto::hash160_hex(crypto::hex_to_bytes(crypto::sha256_hex(from_addr)));
         tx.outputs.push_back(change_out);
-        utxo_set_[from_addr].push_back(change_out);
     }
     
     tx.txid = crypto::hash256_hex(from_addr + to_addr + std::to_string(amount_sats) + std::to_string(tx.timestamp));

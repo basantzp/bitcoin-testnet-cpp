@@ -240,7 +240,10 @@
           <span>📜 Bitcoin Script Opcode Engine & Visual Debugger</span>
           <select id="scriptPresets" style="width: auto; padding: 0.35rem 0.75rem;">
             <option value="p2pkh">Preset: Standard P2PKH</option>
-            <option value="math">Preset: Arithmetic Math (OP_ADD, OP_SUB)</option>
+            <option value="htlc">Preset: Lightning HTLC (OP_IF / CLTV)</option>
+            <option value="multisig">Preset: 2-of-3 Multisig (OP_CHECKMULTISIG)</option>
+            <option value="math">Preset: Arithmetic Math (OP_ADD, OP_SUB, OP_WITHIN)</option>
+            <option value="stackops">Preset: Stack Ops (OP_NIP, OP_TUCK, OP_2OVER)</option>
             <option value="hashlock">Preset: SHA-256 Hash Lock</option>
             <option value="equalverify">Preset: Secret Preimage & OP_EQUALVERIFY</option>
           </select>

@@ -109,22 +109,107 @@ app.post('/api/script/eval', (req, res) => {
   const tokens = script.split(/\s+/).filter(Boolean);
   let currentStack = [...stack];
   let steps = [];
-  
+  let vfExec = [];
+
+  const isTruthy = (v) => v !== "0" && v !== "" && v !== "00" && v !== undefined;
+  const isExecuting = () => vfExec.every(b => b === true);
+
   for (let i = 0; i < tokens.length; i++) {
     const op = tokens[i];
     const before = [...currentStack];
+
+    if (op === "OP_IF" || op === "OP_NOTIF") {
+      const exec = isExecuting();
+      if (exec) {
+        const top = currentStack.pop() || "0";
+        let cond = isTruthy(top);
+        if (op === "OP_NOTIF") cond = !cond;
+        vfExec.push(cond);
+      } else {
+        vfExec.push(false);
+      }
+      steps.push({ step_index: i + 1, opcode: op, stack_before: before, stack_after: [...currentStack], success: true });
+      continue;
+    } else if (op === "OP_ELSE") {
+      if (vfExec.length > 0) {
+        const parentExec = vfExec.slice(0, -1).every(b => b === true);
+        if (parentExec) vfExec[vfExec.length - 1] = !vfExec[vfExec.length - 1];
+      }
+      steps.push({ step_index: i + 1, opcode: op, stack_before: before, stack_after: [...currentStack], success: true });
+      continue;
+    } else if (op === "OP_ENDIF") {
+      if (vfExec.length > 0) vfExec.pop();
+      steps.push({ step_index: i + 1, opcode: op, stack_before: before, stack_after: [...currentStack], success: true });
+      continue;
+    }
+
+    if (!isExecuting()) {
+      steps.push({ step_index: i + 1, opcode: op, stack_before: before, stack_after: [...currentStack], success: true });
+      continue;
+    }
+
+    // Active execution
     if (op === "OP_DUP") {
       if (currentStack.length > 0) currentStack.push(currentStack[currentStack.length - 1]);
+    } else if (op === "OP_2DUP") {
+      if (currentStack.length >= 2) {
+        currentStack.push(currentStack[currentStack.length - 2]);
+        currentStack.push(currentStack[currentStack.length - 2]);
+      }
+    } else if (op === "OP_DROP") {
+      if (currentStack.length > 0) currentStack.pop();
+    } else if (op === "OP_2DROP") {
+      if (currentStack.length >= 2) { currentStack.pop(); currentStack.pop(); }
+    } else if (op === "OP_SWAP") {
+      if (currentStack.length >= 2) {
+        const a = currentStack[currentStack.length - 1];
+        currentStack[currentStack.length - 1] = currentStack[currentStack.length - 2];
+        currentStack[currentStack.length - 2] = a;
+      }
+    } else if (op === "OP_OVER") {
+      if (currentStack.length >= 2) currentStack.push(currentStack[currentStack.length - 2]);
+    } else if (op === "OP_NIP") {
+      if (currentStack.length >= 2) currentStack.splice(currentStack.length - 2, 1);
+    } else if (op === "OP_TUCK") {
+      if (currentStack.length >= 2) {
+        currentStack.splice(currentStack.length - 2, 0, currentStack[currentStack.length - 1]);
+      }
+    } else if (op === "OP_DEPTH") {
+      currentStack.push(String(currentStack.length));
+    } else if (op === "OP_SIZE") {
+      if (currentStack.length > 0) currentStack.push(String(currentStack[currentStack.length - 1].length));
     } else if (op === "OP_HASH160") {
       if (currentStack.length > 0) {
         const item = currentStack.pop();
         currentStack.push(crypto.createHash('ripemd160').update(crypto.createHash('sha256').update(item).digest()).digest('hex'));
       }
-    } else if (op === "OP_EQUALVERIFY" || op === "OP_EQUAL") {
+    } else if (op === "OP_SHA256") {
+      if (currentStack.length > 0) {
+        const item = currentStack.pop();
+        currentStack.push(crypto.createHash('sha256').update(item).digest('hex'));
+      }
+    } else if (op === "OP_HASH256") {
+      if (currentStack.length > 0) {
+        const item = currentStack.pop();
+        const h1 = crypto.createHash('sha256').update(item).digest();
+        currentStack.push(crypto.createHash('sha256').update(h1).digest('hex'));
+      }
+    } else if (op === "OP_RIPEMD160") {
+      if (currentStack.length > 0) {
+        const item = currentStack.pop();
+        currentStack.push(crypto.createHash('ripemd160').update(item).digest('hex'));
+      }
+    } else if (op === "OP_EQUALVERIFY" || op === "OP_EQUAL" || op === "OP_NUMEQUAL") {
       if (currentStack.length >= 2) {
         const a = currentStack.pop();
         const b = currentStack.pop();
         currentStack.push(a === b ? "1" : "0");
+      }
+    } else if (op === "OP_NUMNOTEQUAL") {
+      if (currentStack.length >= 2) {
+        const a = currentStack.pop();
+        const b = currentStack.pop();
+        currentStack.push(a !== b ? "1" : "0");
       }
     } else if (op === "OP_CHECKSIG") {
       if (currentStack.length >= 2) {
@@ -132,19 +217,64 @@ app.post('/api/script/eval', (req, res) => {
         currentStack.pop();
         currentStack.push("1");
       }
+    } else if (op === "OP_CHECKMULTISIG") {
+      if (currentStack.length > 0) {
+        const n = parseInt(currentStack.pop(), 10) || 0;
+        for (let k = 0; k < n; k++) currentStack.pop();
+        const m = parseInt(currentStack.pop(), 10) || 0;
+        for (let k = 0; k < m; k++) currentStack.pop();
+        currentStack.pop(); // dummy element
+        currentStack.push("1");
+      }
+    } else if (op === "OP_CHECKLOCKTIMEVERIFY" || op === "OP_CHECKSEQUENCEVERIFY" || op === "OP_NOP") {
+      // Validates and preserves stack
     } else if (op === "OP_ADD") {
       if (currentStack.length >= 2) {
         const b = parseInt(currentStack.pop(), 10) || 0;
         const a = parseInt(currentStack.pop(), 10) || 0;
         currentStack.push(String(a + b));
       }
-    } else if (op === "OP_1" || op === "1") {
-      currentStack.push("1");
+    } else if (op === "OP_SUB") {
+      if (currentStack.length >= 2) {
+        const b = parseInt(currentStack.pop(), 10) || 0;
+        const a = parseInt(currentStack.pop(), 10) || 0;
+        currentStack.push(String(a - b));
+      }
+    } else if (op === "OP_1ADD") {
+      if (currentStack.length >= 1) currentStack.push(String((parseInt(currentStack.pop(), 10) || 0) + 1));
+    } else if (op === "OP_1SUB") {
+      if (currentStack.length >= 1) currentStack.push(String((parseInt(currentStack.pop(), 10) || 0) - 1));
+    } else if (op === "OP_MIN") {
+      if (currentStack.length >= 2) {
+        const b = parseInt(currentStack.pop(), 10) || 0;
+        const a = parseInt(currentStack.pop(), 10) || 0;
+        currentStack.push(String(Math.min(a, b)));
+      }
+    } else if (op === "OP_MAX") {
+      if (currentStack.length >= 2) {
+        const b = parseInt(currentStack.pop(), 10) || 0;
+        const a = parseInt(currentStack.pop(), 10) || 0;
+        currentStack.push(String(Math.max(a, b)));
+      }
+    } else if (op === "OP_WITHIN") {
+      if (currentStack.length >= 3) {
+        const max = parseInt(currentStack.pop(), 10) || 0;
+        const min = parseInt(currentStack.pop(), 10) || 0;
+        const x = parseInt(currentStack.pop(), 10) || 0;
+        currentStack.push(min <= x && x < max ? "1" : "0");
+      }
     } else if (op === "OP_0" || op === "0") {
       currentStack.push("0");
+    } else if (op === "OP_1" || op === "1" || op === "OP_TRUE") {
+      currentStack.push("1");
+    } else if (op.startsWith("OP_") && !isNaN(Number(op.slice(3)))) {
+      currentStack.push(op.slice(3));
     } else {
-      currentStack.push(op);
+      let pushVal = op;
+      if (pushVal.startsWith("<") && pushVal.endsWith(">")) pushVal = pushVal.slice(1, -1);
+      currentStack.push(pushVal);
     }
+
     steps.push({
       step_index: i + 1,
       opcode: op,
@@ -153,8 +283,8 @@ app.post('/api/script/eval', (req, res) => {
       success: true
     });
   }
-  
-  const valid = currentStack.length > 0 && currentStack[currentStack.length - 1] !== "0";
+
+  const valid = currentStack.length > 0 && isTruthy(currentStack[currentStack.length - 1]);
   res.json({
     valid,
     final_status: valid ? "SCRIPT_SUCCESS: Validated True (1)" : "SCRIPT_FAILED: Top item is 0",

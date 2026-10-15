@@ -16,9 +16,9 @@ $(TARGET): $(OBJS)
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-test: src/crypto.o src/script.o tests/test_script_vm.cpp
+test: src/crypto.o src/script.o src/blockchain.o tests/test_script_vm.cpp
 	@mkdir -p bin
-	$(CXX) $(CXXFLAGS) -I./src src/crypto.o src/script.o tests/test_script_vm.cpp -o bin/test_script_vm $(LDFLAGS)
+	$(CXX) $(CXXFLAGS) -I./src src/crypto.o src/script.o src/blockchain.o tests/test_script_vm.cpp -o bin/test_script_vm $(LDFLAGS)
 	./bin/test_script_vm
 
 clean:
